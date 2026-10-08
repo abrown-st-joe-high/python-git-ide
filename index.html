@@ -608,7 +608,7 @@ while True:
     else:
         print("Bot: Tell me more...")
 `;
-const newProj=(n,code)=>({name:n,files:[{name:'main.py',code}],cur:0,git:null});
+const newProj=(n,code)=>({name:n,files:[{name:'',code}],cur:0,git:null});
 let S={projects:[newProj('my-project',START)],p:0,o:{}};
 try{
   const r=JSON.parse(localStorage.getItem(KEY));
