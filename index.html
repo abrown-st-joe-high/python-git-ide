@@ -46,7 +46,7 @@ details{position:relative}summary{cursor:pointer;padding:6px 12px;background:#33
 <input id="fname" placeholder="file name" spellcheck="false" autocomplete="off" aria-label="File name">
 <button id="run" class="pri">▶ Run</button><button id="stop" disabled>■ Stop</button>
 <span class="sp"></span><span id="st" hidden></span>
-<button id="save" hidden>💾 Save</button><button id="dl">⬇ Download all (JSON)</button>
+<button id="save" hidden>💾 Save</button><button id="dl">⬇ Download all (JSON)</button><button id="imp">⬆ Import JSON</button><input type="file" id="impf" accept=".json,application/json" hidden>
 <details id="opts"><summary>⚙ Options</summary><div class="menu">
 <label><input type="checkbox" id="o-saved"> Show last saved time</label>
 <label><input type="checkbox" id="o-files"> Show file list</label>
@@ -767,8 +767,53 @@ $('dl').onclick=()=>{
   const fl=p=>p.files.map(f=>({name:f.name,content:f.code}));
   const data=S.o.git?{projects:S.projects.map(p=>({name:p.name,files:fl(p),git:p.git}))}:{files:fl(P())};
   const b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='python-files.json';
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);const d=new Date(),z=n=>String(n).padStart(2,'0');
+  a.download=`pythit_save_${d.getFullYear()}_${z(d.getMonth()+1)}_${z(d.getDate())}_${z(d.getHours())}_${z(d.getMinutes())}_${z(d.getSeconds())}.json`;
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+const vg=g=>g&&typeof g=='object'&&typeof g.head=='string'&&['br','c','tags','index'].every(k=>g[k]&&typeof g[k]=='object')?g:null;
+function uniq(n,taken,sep){
+  if(!taken.includes(n))return n;
+  const m=/^(.*?)(\.[^.]*)?$/.exec(n);let i=2;
+  while(taken.includes(m[1]+sep+i+(m[2]||'')))i++;
+  return m[1]+sep+i+(m[2]||'')}
+function importData(d){
+  const fl=(v,taken)=>{
+    const out=[],names=[...taken];
+    (Array.isArray(v)?v:[]).forEach(f=>{
+      if(!f||typeof f!='object')return;
+      let n=String(f.name??'').trim();
+      if(!n)n='untitled.py';
+      n=uniq(n,names,'_');names.push(n);
+      out.push({name:n,code:String(f.content??f.code??'')})});
+    return out};
+  const isBlank=p=>!p.git&&p.files.length==1&&!p.files[0].name&&!p.files[0].code;
+  grab();
+  let added=0,nf=0;
+  if(d&&Array.isArray(d.projects)){
+    const inc=d.projects.filter(p=>p&&typeof p=='object');
+    if(!inc.length)throw new Error('no projects found');
+    if(S.projects.every(isBlank))S.projects=[];
+    const first=S.projects.length;
+    inc.forEach(p=>{
+      const files=fl(p.files,[]);if(!files.length)files.push({name:'',code:''});
+      const name=uniq(String(p.name||'imported').trim()||'imported',S.projects.map(x=>x.name),'_');
+      S.projects.push({name,files,cur:0,git:vg(p.git)});added++;nf+=files.length});
+    S.p=first;
+    if(!S.o.git&&(inc.length>1||S.projects.slice(first).some(p=>p.git))){S.o.git=true;S.o.files=true;saveOpts()}}
+  else if(d&&Array.isArray(d.files)){
+    const pr=P(),blank=isBlank(pr),files=fl(d.files,blank?[]:pr.files.map(f=>f.name));
+    if(!files.length)throw new Error('no files found');
+    if(blank)pr.files=[];
+    pr.files.push(...files);pr.cur=pr.files.length-files.length;nf=files.length;added=1}
+  else throw new Error('this does not look like a Pythit save');
+  load();applyOpts();autoSave();
+  alert(`Imported ${nf} file${nf==1?'':'s'}${d.projects?' in '+added+' project'+(added==1?'':'s'):''}.`+(S.o.git&&d.projects&&added?'\nLearning Git mode is on so you can see the projects and their history.':''))}
+$('imp').onclick=()=>$('impf').click();
+$('impf').onchange=async e=>{
+  const f=e.target.files[0];e.target.value='';
+  if(!f)return;
+  try{importData(JSON.parse(await f.text()))}
+  catch(x){alert('Could not import that file: '+(x&&x.message||x))}};
 $('save').onclick=()=>save();
 addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()=='s'){e.preventDefault();save()}});
 setInterval(()=>{if(!S.o.manual)save()},5000);
