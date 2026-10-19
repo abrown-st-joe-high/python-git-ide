@@ -32,7 +32,19 @@ button.pri{background:#2d7d46;border-color:#2d7d46}
 #errbar{padding:8px 12px;font:13px var(--mono);border-top:1px solid var(--ln)}
 #errbar.ok{background:#1d2a22;color:var(--ok)}#errbar.bad{background:#3a1f24;color:var(--er);cursor:pointer}
 [hidden]{display:none!important}
-#errbar.off{background:#20222c;color:var(--mu)}.f .un{font-style:italic;color:var(--mu)}
+#errbar.off{background:#20222c;color:var(--mu)}
+#ab{flex:none;height:26px;background:var(--pn)}#ab.on{background:var(--abc,#000)}
+.abw{position:relative;display:inline-block}.abg{display:inline-flex}
+.abg button:first-child{border-radius:6px 0 0 6px}.abg button:last-child{border-radius:0 6px 6px 0;border-left:0;padding:6px 8px}
+.abg button.on{background:#33405e;border-color:var(--ac)}
+#abp{gap:8px;align-items:stretch}
+#wwrap{position:relative;width:160px;height:160px;margin:0 auto}
+#wheel{display:block;border-radius:50%;cursor:crosshair;touch-action:none}
+#mk{position:absolute;width:14px;height:14px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px #000;transform:translate(-50%,-50%);pointer-events:none}
+.sl{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--mu)}
+.rgbrow{display:flex;gap:6px}.rgbrow label{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--mu)}
+.rgbrow input{width:56px;background:var(--bg);color:var(--tx);border:1px solid var(--ln);border-radius:6px;padding:4px 6px;font:13px var(--mono)}
+#abhex{font:12px var(--mono);color:var(--mu);text-align:center}.f .un{font-style:italic;color:var(--mu)}
 #term .g{color:var(--ok)}#term .r{color:var(--er)}#term .y{color:#f0c674}#term .p{color:#7fb4ff}
 select{background:var(--bg);color:var(--tx);border:1px solid var(--ln);border-radius:6px;padding:3px 6px;font:inherit;max-width:120px}
 .f span{flex:1}.b{font:bold 11px var(--mono);font-style:normal;margin:0 4px;flex:none}.b.g{color:var(--ok)}.b.r{color:var(--er)}
@@ -41,12 +53,20 @@ details{position:relative}summary{cursor:pointer;padding:6px 12px;background:#33
 .menu{position:absolute;right:0;top:36px;z-index:5;background:var(--pn);border:1px solid var(--ln);border-radius:6px;padding:10px 14px;display:flex;flex-direction:column;gap:10px;white-space:nowrap}
 @media(max-width:800px){#main{display:flex;flex-direction:column}#main>section{flex:1}#main>aside{max-height:150px}}
 </style></head><body>
+<div id="ab" title="AB Mode banner"></div>
 <header>
 <b>Chatbox IDE Pythit</b><button id="ftog">📁 Files ▾</button>
 <input id="fname" placeholder="file name" spellcheck="false" autocomplete="off" aria-label="File name">
 <button id="run" class="pri">▶ Run</button><button id="stop" disabled>■ Stop</button>
 <span class="sp"></span><span id="st" hidden></span>
 <button id="save" hidden>💾 Save</button><button id="dl">⬇ Download all (JSON)</button><button id="imp">⬆ Import JSON</button><input type="file" id="impf" accept=".json,application/json" hidden>
+<span id="abw" class="abw"><span class="abg"><button id="abt" aria-pressed="false">AB Mode</button><button id="abd" title="Choose banner color" aria-label="Choose banner color">▾</button></span>
+<div id="abp" class="menu" hidden>
+<div id="wwrap"><canvas id="wheel" width="160" height="160"></canvas><div id="mk"></div></div>
+<label class="sl">Brightness<input type="range" id="abv" min="0" max="255" value="255"></label>
+<div class="rgbrow"><label>R<input type="number" id="abr" min="0" max="255"></label><label>G<input type="number" id="abg" min="0" max="255"></label><label>B<input type="number" id="abb" min="0" max="255"></label></div>
+<div id="abhex"></div>
+</div></span>
 <details id="opts"><summary>⚙ Options</summary><div class="menu">
 <label><input type="checkbox" id="o-saved"> Show last saved time</label>
 <label><input type="checkbox" id="o-files"> Show file list</label>
@@ -746,7 +766,7 @@ function renderFiles(){
     d.append(x);d.onclick=()=>{if(i!=P().cur){grab();P().cur=i;load()}};l.append(d)})}
 function load(){
   const f=cur();ta.value=f.code;$('fname').value=f.name;$('fname').classList.remove('bad');
-  err=null;mark();renderFiles();ta.scrollTop=0}
+  err=null;mark();renderFiles();ta.scrollTop=0;abOv=null;applyAB()}
 function del(i){
   const fs=P().files;
   if(fs.length==1){alert('You need to keep at least one file.');return}
@@ -759,7 +779,7 @@ $('new').onclick=()=>{
   fs.push({name:'untitled'+n+'.py',code:''});P().cur=fs.length-1;load();autoSave();$('fname').select()};
 $('fname').oninput=()=>{
   const v=$('fname').value.trim(),ok=v&&!P().files.some((f,i)=>i!=P().cur&&f.name==v);
-  $('fname').classList.toggle('bad',!ok);if(ok){cur().name=v;renderFiles();markU()}};
+  $('fname').classList.toggle('bad',!ok);if(ok){cur().name=v;renderFiles();markU();abOv=null;applyAB()}};
 $('fname').onchange=()=>{$('fname').value=cur().name;$('fname').classList.remove('bad')};
 $('fname').onkeydown=e=>{if(e.key=='Enter')$('fname').blur()};
 $('dl').onclick=()=>{
@@ -844,6 +864,67 @@ $('delp').onclick=()=>{
   if(S.projects.length==1){alert('You need at least one project.');return}
   if(!confirm('Delete project '+P().name+', all its files and its git history?'))return;
   S.projects.splice(S.p,1);S.p=Math.max(0,S.p-1);load();showPrompt(false);autoSave()};
+
+/* ---------- AB mode banner ---------- */
+let abOv=null,hsv=[0,0,0];
+const abAuto=()=>!['HelloWorld.py','HelloName.py'].includes(cur().name);
+const abOn=()=>abOv??abAuto();
+const AB=()=>Array.isArray(S.o.ab)&&S.o.ab.length==3?S.o.ab:[0,0,0];
+const wc=$('wheel'),WW=160,WR=WW/2;
+function h2r(h,s,v){const f=n=>{const k=(n+h/60)%6;return v-v*s*Math.max(0,Math.min(k,4-k,1))};return[f(5),f(3),f(1)].map(x=>Math.round(x*255))}
+function r2h(r,g,b){
+  r/=255;g/=255;b/=255;
+  const mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn;let h=0;
+  if(d){h=mx==r?((g-b)/d)%6:mx==g?(b-r)/d+2:(r-g)/d+4;h*=60;if(h<0)h+=360}
+  return[h,mx?d/mx:0,mx]}
+function applyAB(){
+  const on=abOn(),[r,g,b]=AB();
+  $('ab').classList.toggle('on',on);
+  $('ab').style.setProperty('--abc',`rgb(${r},${g},${b})`);
+  $('abt').classList.toggle('on',on);
+  $('abt').setAttribute('aria-pressed',on)}
+function drawWheel(){
+  const x=wc.getContext('2d'),im=x.createImageData(WW,WW),v=hsv[2];
+  for(let j=0;j<WW;j++)for(let i=0;i<WW;i++){
+    const dx=i+.5-WR,dy=j+.5-WR,d=Math.hypot(dx,dy),k=(j*WW+i)*4;
+    if(d>WR)continue;
+    let h=Math.atan2(dy,dx)*180/Math.PI;if(h<0)h+=360;
+    const c=h2r(h,d/WR,v);im.data[k]=c[0];im.data[k+1]=c[1];im.data[k+2]=c[2];im.data[k+3]=255}
+  x.putImageData(im,0,0)}
+function paintAB(redraw){
+  const c=h2r(hsv[0],hsv[1],hsv[2]);
+  const set=(id,v)=>{if(document.activeElement!==$(id))$(id).value=v};
+  set('abr',c[0]);set('abg',c[1]);set('abb',c[2]);set('abv',Math.round(hsv[2]*255));
+  const a=hsv[0]*Math.PI/180,d=hsv[1]*WR;
+  $('mk').style.left=(WR+d*Math.cos(a))+'px';$('mk').style.top=(WR+d*Math.sin(a))+'px';
+  $('abhex').textContent='#'+c.map(x=>x.toString(16).padStart(2,'0')).join('');
+  if(redraw)drawWheel();
+  applyAB()}
+function syncAB(redraw){
+  S.o.ab=h2r(hsv[0],hsv[1],hsv[2]);S.o.abSet=true;
+  paintAB(redraw);saveOpts()}
+function pickWheel(e){
+  const b=wc.getBoundingClientRect(),sx=WW/(b.width||WW);
+  const dx=(e.clientX-b.left)*sx-WR,dy=(e.clientY-b.top)*sx-WR,d=Math.min(Math.hypot(dx,dy),WR);
+  let h=Math.atan2(dy,dx)*180/Math.PI;if(h<0)h+=360;
+  const wasZero=!hsv[2];if(wasZero)hsv[2]=1;
+  hsv=[h,d/WR,hsv[2]];syncAB(wasZero)}
+wc.onpointerdown=e=>{wc.setPointerCapture(e.pointerId);pickWheel(e)};
+wc.onpointermove=e=>{if(e.buttons)pickWheel(e)};
+$('abv').oninput=()=>{hsv[2]=(+$('abv').value||0)/255;syncAB(true)};
+const rgbIds=['abr','abg','abb'];
+const rgbVals=()=>rgbIds.map(i=>{const n=parseInt($(i).value,10);return isNaN(n)?0:Math.max(0,Math.min(255,n))});
+rgbIds.forEach(id=>{
+  $(id).oninput=()=>{
+    const[h,s,v]=r2h(...rgbVals());
+    hsv=[s>0?h:hsv[0],v>0?s:hsv[1],v];syncAB(true)};
+  $(id).onchange=()=>{const c=h2r(hsv[0],hsv[1],hsv[2]);rgbIds.forEach((x,i)=>{$(x).value=c[i]})}});
+$('abt').onclick=()=>{
+  abOv=!abOn();applyAB();
+  if(abOv&&!S.o.abSet)$('abp').hidden=false};
+$('abd').onclick=()=>{$('abp').hidden=!$('abp').hidden};
+addEventListener('click',e=>{if(!$('abw').contains(e.target))$('abp').hidden=true});
+hsv=r2h(...AB());paintAB(true);
 
 /* ---------- learning git mode (local only) ---------- */
 let dirty=false;
